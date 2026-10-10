@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"path/filepath"
 	"syscall"
 	"unicode/utf8"
@@ -56,6 +57,23 @@ func handleEvent(evt any) {
 		return
 	}
 
+    if strings.HasPrefix(text, "WACHUNK1|") {
+    parts := strings.SplitN(text, "|", 5)
+    if len(parts) != 5 {
+        fmt.Println("[CHUNK] invalid header")
+        return
+    }
+
+    fmt.Printf(
+        "[CHUNK] id=%s part=%s/%s bytes=%d received=true\n",
+        parts[1],
+        parts[2],
+        parts[3],
+        len(parts[4]),
+    )
+    return
+    }
+	
 	fmt.Printf(
 		"[CHAT] bytes=%d chars=%d text_received=true\n",
 		len(text),
