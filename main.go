@@ -40,9 +40,9 @@ func handleEvent(evt any) {
 
 	// استقبال الرسائل النصية من محادثة المستخدم مع نفسه.
 	if v.Info.IsGroup || !v.Info.IsFromMe ||
-		v.Info.Chat != v.Info.Sender {
-		return
-	}
+    v.Info.Chat != v.Info.Sender.ToNonAD() {
+    return
+ }
 
 	var text string
 
