@@ -43,6 +43,7 @@ func handleEvent(evt any) {
     v.Info.Chat != v.Info.Sender.ToNonAD() {
     return
     }
+	
 	var text string
 
 	if v.Message.GetConversation() != "" {
