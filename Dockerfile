@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY go.mod ./
-RUN go mod download
+RUN go mod tidy
 
 COPY . .
 RUN CGO_ENABLED=1 go build -o /wa-client .
