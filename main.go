@@ -3,15 +3,16 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 	"unicode/utf8"
-	"net/http"
-	
+
 	_ "github.com/mattn/go-sqlite3"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
@@ -19,13 +20,15 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
+const qrPath = "/tmp/wa-qr.png"
+
 func handleEvent(evt any) {
 	v, ok := evt.(*events.Message)
 	if !ok {
 		return
 	}
 
-	// نختبر الرسائل النصية في محادثة المستخدم مع نفسه فقط.
+	// استقبال الرسائل النصية من محادثة المستخدم مع نفسه.
 	if v.Info.IsGroup || !v.Info.IsFromMe ||
 		v.Info.Chat != v.Info.Sender {
 		return
@@ -48,6 +51,61 @@ func handleEvent(evt any) {
 		len(text),
 		utf8.RuneCountInString(text),
 	)
+}
+
+func startQRServer() {
+	token := os.Getenv("QR_TOKEN")
+	if token == "" {
+		panic("QR_TOKEN environment variable is required")
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/qr.png", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		provided := r.URL.Query().Get("token")
+		if len(provided) != len(token) ||
+			subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		info, err := os.Stat(qrPath)
+		if err != nil || info.IsDir() {
+			http.Error(w, "QR is not available", http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		http.ServeFile(w, r, qrPath)
+	})
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		fmt.Fprintln(w, "WhatsApp Railway client is running.")
+	})
+
+	go func() {
+		fmt.Println("HTTP server listening on port", port)
+		if err := http.ListenAndServe(":"+port, mux); err != nil {
+			fmt.Println("HTTP server error:", err)
+		}
+	}()
 }
 
 func main() {
@@ -84,6 +142,8 @@ func main() {
 	)
 	client.AddEventHandler(handleEvent)
 
+	startQRServer()
+
 	if client.Store.ID == nil {
 		qrChan, err := client.GetQRChannel(ctx)
 		if err != nil {
@@ -97,19 +157,26 @@ func main() {
 		for evt := range qrChan {
 			switch evt.Event {
 			case "code":
-				fmt.Println("امسح QR من WhatsApp > الأجهزة المرتبطة:")
-
 				cmd := exec.Command(
-					"qrencode", "-t", "ANSIUTF8", evt.Code,
+					"qrencode",
+					"-o", qrPath,
+					"-s", "8",
+					"-m", "2",
+					evt.Code,
 				)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
 
 				if err := cmd.Run(); err != nil {
-					fmt.Println("تعذر عرض QR:", err)
-					fmt.Println("QR data:", evt.Code)
+					fmt.Println("QR generation failed:", err)
+				} else {
+					fmt.Println("QR image ready at /qr.png")
 				}
 
+			case "success":
+				_ = os.Remove(qrPath)
+				fmt.Println("WhatsApp linked successfully.")
+			case "timeout":
+				_ = os.Remove(qrPath)
+				fmt.Println("QR expired. Waiting for another code.")
 			default:
 				fmt.Println("Login event:", evt.Event)
 			}
@@ -126,6 +193,6 @@ func main() {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	<-sig
 
-	fmt.Println("Disconnecting...")
+	_ = os.Remove(qrPath)
 	client.Disconnect()
 }
