@@ -10,7 +10,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"unicode/utf8"
-
+	"net/http"
+	
 	_ "github.com/mattn/go-sqlite3"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
