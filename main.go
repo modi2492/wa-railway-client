@@ -28,6 +28,16 @@ func handleEvent(evt any) {
 		return
 	}
 
+	// تشخيص كل رسالة قبل شروط الفلترة.
+	fmt.Printf(
+		"[DEBUG] fromMe=%v group=%v chat=%s sender=%s id=%s\n",
+		v.Info.IsFromMe,
+		v.Info.IsGroup,
+		v.Info.Chat,
+		v.Info.Sender,
+		v.Info.ID,
+	)
+
 	// استقبال الرسائل النصية من محادثة المستخدم مع نفسه.
 	if v.Info.IsGroup || !v.Info.IsFromMe ||
 		v.Info.Chat != v.Info.Sender {
