@@ -42,8 +42,7 @@ func handleEvent(evt any) {
 	if v.Info.IsGroup || !v.Info.IsFromMe ||
     v.Info.Chat != v.Info.Sender.ToNonAD() {
     return
- }
-
+    }
 	var text string
 
 	if v.Message.GetConversation() != "" {
