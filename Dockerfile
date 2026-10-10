@@ -8,9 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY go.mod ./
+COPY main.go ./
 RUN go mod tidy
-
-COPY . .
 RUN CGO_ENABLED=1 go build -o /wa-client .
 
 FROM debian:bookworm-slim
